@@ -98,7 +98,7 @@
     async function load() {
       if (!key) return;
       try {
-        const res = await fetch(`${API}/wallet?key_private=${key}`);
+        const res = await fetch(`${API}/Wallet?key_private=${key}`);
         wallet = await res.json();
         if (wallet.address) {
           document.getElementById('balance').textContent = wallet.balance;
@@ -222,7 +222,7 @@
       const k = document.getElementById('keyInput').value;
       if (!k) return alert('Enter key');
       try {
-        const res = await fetch(`${API}/wallet?key_private=${k}`);
+        const res = await fetch(`${API}/Wallet?key_private=${k}`);
         const data = await res.json();
         if (data.address) {
           localStorage.setItem('evc_key', k);
@@ -246,7 +246,8 @@
 
     async function create() {
       try {
-        const res = await fetch(`${API}/wallet?create=true`, {method:'POST'});
+        // Changed from POST to GET request
+        const res = await fetch(`${API}/Wallet?create=true`);
         const data = await res.json();
         if (data.key_private) {
           document.getElementById('settingsRes').innerHTML = `
@@ -261,9 +262,12 @@
           localStorage.setItem('evc_key', data.key_private);
           key = data.key_private;
           setTimeout(() => { closeModal(); load(); }, 3000);
+        } else {
+          alert(data.message || 'Error creating wallet');
         }
       } catch (e) {
-        alert('Error');
+        console.error('Create wallet error:', e);
+        alert('Error creating wallet. Check console for details.');
       }
     }
 
@@ -314,7 +318,7 @@
       
       try {
         const ch = await fetch(`${API}/mine?get_challenge=true`).then(r=>r.json());
-        const acc = await fetch(`${API}/wallet?key_private=${key}`).then(r=>r.json());
+        const acc = await fetch(`${API}/Wallet?key_private=${key}`).then(r=>r.json());
         const addr = acc.address;
         const ts = ch.timestamp;
         const tgt = ch.target;
