@@ -112,9 +112,7 @@
       const modal = document.getElementById('modal');
       const title = document.getElementById('modalTitle');
       const content = document.getElementById('modalContent');
-      
       modal.classList.remove('hidden');
-      
       if (type === 'send') {
         title.textContent = 'Send EVCoin';
         content.innerHTML = `
@@ -126,7 +124,6 @@
         `;
         getFee();
       }
-      
       if (type === 'receive') {
         title.textContent = 'Receive EVCoin';
         content.innerHTML = `
@@ -136,7 +133,6 @@
           <button onclick="copy('${wallet?.address}')" class="w-full bg-gray-200 p-3 rounded-xl font-semibold">Copy</button>
         `;
       }
-      
       if (type === 'mine') {
         title.textContent = 'Mine EVCoin';
         content.innerHTML = `
@@ -162,7 +158,6 @@
         `;
         getStats();
       }
-      
       if (type === 'wallet') {
         title.textContent = 'Wallet';
         content.innerHTML = `
@@ -182,7 +177,6 @@
           </div>
         `;
       }
-      
       if (type === 'backup') {
         title.textContent = 'Backup';
         content.innerHTML = `
@@ -193,13 +187,11 @@
           <div id="backupRes" class="mt-3"></div>
         `;
       }
-      
       if (type === 'history') {
         title.textContent = 'History';
         content.innerHTML = '<div class="text-center text-gray-600">Loading...</div>';
         getHistory();
       }
-      
       if (type === 'settings') {
         title.textContent = 'Settings';
         content.innerHTML = `
@@ -297,138 +289,56 @@
       } catch (e) {}
     }
 
-    async function getStats() {
-      try {
-        const res = await fetch(`${API}/mine`);
-        const data = await res.json();
-        document.getElementById('diff').textContent = data.difficulty;
-        document.getElementById('reward').textContent = data.currentReward.toFixed(5);
-      } catch (e) {}
-    }
-
-    async function mine() {
-      if (!key) return alert('Login first');
-      const btn = document.getElementById('mineBtn');
-      btn.disabled = true;
-      btn.textContent = 'Starting...';
-      document.getElementById('mineProg').classList.remove('hidden');
-      
-      try {
-        const start = await fetch(`${API}/mine?private_key=${key}&start_mine=true`).then(r=>r.json());
-        
-        if (start.message && start.message.includes('Wait')) {
-          document.getElementById('mineRes').innerHTML = `<div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-xl text-sm">${start.message}</div>`;
-          btn.disabled = false;
-          btn.textContent = 'Start Mining';
-          document.getElementById('mineProg').classList.add('hidden');
-          return;
-        }
-
-        document.getElementById('status').textContent = 'Mining on server...';
-        
-        let attempts = 0;
-        miningInterval = setInterval(async () => {
-          attempts++;
-          
-          const status = await fetch(`${API}/mine?private_key=${key}&check_status=true`).then(r=>r.json());
-          
-          if (status.status === 'completed') {
-            clearInterval(miningInterval);
-            document.getElementById('progBar').style.width = '100%';
-            const el = document.getElementById('mineRes');
-            el.innerHTML = `<div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-xl text-sm">Success!<br>Mined: ${status.result.minedAmount}<br>Balance: ${status.result.newBalance}</div>`;
-            btn.disabled = false;
-            btn.textContent = 'Start Mining';
-            document.getElementById('mineProg').classList.add('hidden');
-            load();
-            return;
-          }
-          
-          if (status.status === 'failed') {
-            clearInterval(miningInterval);
-            const el = document.getElementById('mineRes');
-            el.innerHTML = `<div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl text-sm">${status.message || 'Failed'}</div>`;
-            btn.disabled = false;
-            btn.textContent = 'Start Mining';
-            document.getElementById('mineProg').classList.add('hidden');
-            return;
-          }
-          
-          const progress = status.progress || (attempts * 2);
-          document.getElementById('progBar').style.width = Math.min(progress, 95) + '%';
-          document.getElementById('status').textContent = status.message || 'Mining...';
-          
-          if (attempts > 30) {
-            clearInterval(miningInterval);
-            document.getElementById('mineRes').innerHTML = `<div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl text-sm">Timeout</div>`;
-            btn.disabled = false;
-            btn.textContent = 'Start Mining';
-            document.getElementById('mineProg').classList.add('hidden');
-          }
-        }, 2000);
-
-      } catch (e) {
-        if (miningInterval) clearInterval(miningInterval);
-        document.getElementById('mineRes').innerHTML = `<div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl text-sm">Error</div>`;
-        btn.disabled = false;
-        btn.textContent = 'Start Mining';
-        document.getElementById('mineProg').classList.add('hidden');
-      }
-    }
-
-    async function backup() {
-      if (!key) return alert('Login first');
-      try {
-        const res = await fetch(`${API}/backup?key_private=${key}`);
-        const data = await res.json();
-        if (data.encrypted) {
-          document.getElementById('backupRes').innerHTML = `
-            <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-xl text-sm">
-              <strong>Created!</strong><br>
-              <strong>⚠️ SAVE:</strong><br>
-              <textarea class="w-full mt-2 p-2 text-xs font-mono bg-white border rounded" rows="4">${data.encrypted}</textarea>
-            </div>
-          `;
-          localStorage.removeItem('evc_key');
-          key = null;
-          wallet = null;
-        }
-      } catch (e) {
-        alert('Error');
-      }
-    }
-
     async function getHistory() {
-      try {
-        const res = await fetch(`${API}/transfer`);
-        const data = await res.json();
-        const addr = wallet?.address;
-        const filtered = data.filter(t => t.from===addr || t.to===addr).slice(-10).reverse();
-        
-        if (filtered.length === 0) {
-          document.getElementById('modalContent').innerHTML = '<div class="text-center text-gray-600">No transactions</div>';
-          return;
-        }
-        
-        const html = filtered.map(t => {
-          const isSent = t.from === addr;
-          return `
-            <div class="bg-gray-100 p-3 rounded-xl mb-2">
-              <div class="flex justify-between mb-1">
-                <span class="font-semibold text-sm">${isSent ? '📤 Sent' : '📥 Received'}</span>
-                <span class="font-bold text-sm ${isSent ? 'text-red-600' : 'text-green-600'}">${isSent ? '-' : '+'}${t.amount}</span>
-              </div>
-              <div class="text-xs text-gray-600">${isSent ? 'To' : 'From'}: ${(isSent ? t.to : t.from).slice(0,12)}...</div>
-              <div class="text-xs text-gray-600">${new Date(t.timestamp).toLocaleString()}</div>
-            </div>
-          `;
-        }).join('');
-        
-        document.getElementById('modalContent').innerHTML = html;
-      } catch (e) {
-        document.getElementById('modalContent').innerHTML = '<div class="text-center text-red-600">Error</div>';
-      }
+  const modal = document.getElementById('modalContent');
+  try {
+    const res = await fetch(`${API}/transfer`);
+    if (!res.ok) throw new Error('Failed to fetch transactions');
+    const data = await res.json();
+
+    const addr = wallet?.address; 
+    if (!addr) throw new Error('Wallet address not found');
+
+    const transactions = Object.values(data || {});
+    const filtered = transactions.filter(t => t.from === addr || t.to === addr)
+                                 .slice(-10)
+                                 .reverse();
+
+    if (filtered.length === 0) {
+      modal.innerHTML = '<div class="text-center text-gray-600">No transactions</div>';
+      return;
     }
+
+    const accountsRes = await fetch(`${API}/Wallet`);
+    if (!accountsRes.ok) throw new Error('Failed to fetch wallets');
+    const accounts = await accountsRes.json();
+
+    const html = filtered.map(t => {
+      const isSent = t.from === addr;
+      const counterpartyAddr = isSent ? t.to : t.from;
+      const counterpartyAddress = accounts?.[counterpartyAddr]?.address || counterpartyAddr;
+
+      return `
+        <div class="bg-gray-100 p-3 rounded-xl mb-2">
+          <div class="flex justify-between mb-1">
+            <span class="font-semibold text-sm">${isSent ? '📤 Sent' : '📥 Received'}</span>
+            <span class="font-bold text-sm ${isSent ? 'text-red-600' : 'text-green-600'}">
+              ${isSent ? '-' : '+'}${t.amount}
+            </span>
+          </div>
+          <div class="text-xs text-gray-600">${isSent ? 'To' : 'From'}: ${counterpartyAddress.slice(0,12)}...</div>
+          <div class="text-xs text-gray-600">${new Date(t.timestamp).toLocaleString()}</div>
+        </div>
+      `;
+    }).join('');
+
+    modal.innerHTML = html;
+
+  } catch (e) {
+    console.error(e);
+    modal.innerHTML = `<div class="text-center text-red-600">Error loading transactions: ${e.message}</div>`;
+  }
+}
 
     function copy(text) {
       navigator.clipboard.writeText(text);
