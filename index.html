@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EVCoin Wallet</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-purple-600 to-blue-600 min-h-screen p-4">
+  <div class="max-w-md mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden">
+    <div class="bg-gradient-to-r from-purple-600 to-blue-600 p-6 text-white">
+      <h1 class="text-3xl font-bold mb-1">💎 EVCoin</h1>
+      <p class="text-sm opacity-90">Digital Wallet</p>
+      <div class="mt-4 bg-white/20 backdrop-blur rounded-2xl p-4">
+        <p class="text-xs opacity-90">Balance</p>
+        <p class="text-4xl font-bold" id="balance">0.00000</p>
+        <p class="text-sm opacity-80" id="usd">≈ $0.00</p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-3 gap-3 p-4">
+      <button onclick="showModal('send')" class="bg-gray-100 p-4 rounded-xl text-center hover:bg-gray-200">
+        <div class="text-2xl mb-1">📤</div>
+        <div class="text-xs font-semibold">Send</div>
+      </button>
+      <button onclick="showModal('receive')" class="bg-gray-100 p-4 rounded-xl text-center hover:bg-gray-200">
+        <div class="text-2xl mb-1">📥</div>
+        <div class="text-xs font-semibold">Receive</div>
+      </button>
+      <button onclick="showModal('mine')" class="bg-gray-100 p-4 rounded-xl text-center hover:bg-gray-200">
+        <div class="text-2xl mb-1">⛏️</div>
+        <div class="text-xs font-semibold">Mine</div>
+      </button>
+    </div>
+
+    <div class="p-4 space-y-2">
+      <button onclick="showModal('wallet')" class="w-full bg-gray-100 p-4 rounded-xl flex items-center justify-between hover:bg-gray-200">
+        <div class="flex items-center gap-3">
+          <div class="text-2xl">👤</div>
+          <div class="text-left">
+            <div class="font-semibold text-sm">My Wallet</div>
+            <div class="text-xs text-gray-500">View details</div>
+          </div>
+        </div>
+        <div class="text-gray-400">›</div>
+      </button>
+
+      <button onclick="showModal('backup')" class="w-full bg-gray-100 p-4 rounded-xl flex items-center justify-between hover:bg-gray-200">
+        <div class="flex items-center gap-3">
+          <div class="text-2xl">💾</div>
+          <div class="text-left">
+            <div class="font-semibold text-sm">Backup</div>
+            <div class="text-xs text-gray-500">Secure wallet</div>
+          </div>
+        </div>
+        <div class="text-gray-400">›</div>
+      </button>
+
+      <button onclick="showModal('history')" class="w-full bg-gray-100 p-4 rounded-xl flex items-center justify-between hover:bg-gray-200">
+        <div class="flex items-center gap-3">
+          <div class="text-2xl">📜</div>
+          <div class="text-left">
+            <div class="font-semibold text-sm">History</div>
+            <div class="text-xs text-gray-500">Transactions</div>
+          </div>
+        </div>
+        <div class="text-gray-400">›</div>
+      </button>
+
+      <button onclick="showModal('settings')" class="w-full bg-gray-100 p-4 rounded-xl flex items-center justify-between hover:bg-gray-200">
+        <div class="flex items-center gap-3">
+          <div class="text-2xl">⚙️</div>
+          <div class="text-left">
+            <div class="font-semibold text-sm">Settings</div>
+            <div class="text-xs text-gray-500">Login</div>
+          </div>
+        </div>
+        <div class="text-gray-400">›</div>
+      </button>
+    </div>
+  </div>
+
+  <div id="modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold" id="modalTitle">Modal</h2>
+        <button onclick="closeModal()" class="text-2xl">×</button>
+      </div>
+      <div id="modalContent"></div>
+    </div>
+  </div>
+
+  <script>
+    const API = 'https://your-vercel-app.vercel.app/api';
+    let key = localStorage.getItem('evc_key');
+    let wallet = null;
+
+    async function load() {
+      if (!key) return;
+      try {
+        const res = await fetch(`${API}/wallet?key_private=${key}`);
+        wallet = await res.json();
+        if (wallet.address) {
+          document.getElementById('balance').textContent = wallet.balance;
+          document.getElementById('usd').textContent = `≈ $${(parseFloat(wallet.balance) * 0.5).toFixed(2)}`;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function showModal(type) {
+      const modal = document.getElementById('modal');
+      const title = document.getElementById('modalTitle');
+      const content = document.getElementById('modalContent');
+      
+      modal.classList.remove('hidden');
+      
+      if (type === 'send') {
+        title.textContent = 'Send EVCoin';
+        content.innerHTML = `
+          <input type="text" id="addr" placeholder="Recipient address" class="w-full p-3 border rounded-xl mb-3">
+          <input type="number" id="amt" placeholder="Amount" step="0.00001" class="w-full p-3 border rounded-xl mb-3">
+          <div class="text-sm text-gray-600 mb-3">Fee: <span id="fee">0.00001</span> EVC</div>
+          <button onclick="send()" class="w-full bg-purple-600 text-white p-3 rounded-xl font-semibold">Send</button>
+          <div id="sendRes" class="mt-3"></div>
+        `;
+        getFee();
+      }
+      
+      if (type === 'receive') {
+        title.textContent = 'Receive EVCoin';
+        content.innerHTML = `
+          <div class="bg-blue-50 p-4 rounded-xl mb-3 text-sm">Share this address to receive EVCoin</div>
+          <div class="text-xs text-gray-600 mb-1">Your Address</div>
+          <div class="bg-gray-100 p-3 rounded-xl text-xs break-all mb-3">${wallet?.address || '---'}</div>
+          <button onclick="copy('${wallet?.address}')" class="w-full bg-gray-200 p-3 rounded-xl font-semibold">Copy Address</button>
+        `;
+      }
+      
+      if (type === 'mine') {
+        title.textContent = 'Mine EVCoin';
+        content.innerHTML = `
+          <div class="bg-blue-50 p-4 rounded-xl mb-3 text-sm">Mining rewards decrease over time</div>
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <div class="bg-gray-100 p-3 rounded-xl text-center">
+              <div class="text-xs text-gray-600">Difficulty</div>
+              <div class="font-bold text-purple-600" id="diff">---</div>
+            </div>
+            <div class="bg-gray-100 p-3 rounded-xl text-center">
+              <div class="text-xs text-gray-600">Reward</div>
+              <div class="font-bold text-purple-600" id="reward">---</div>
+            </div>
+          </div>
+          <div id="mineProg" class="hidden mb-3">
+            <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
+              <div id="progBar" class="bg-purple-600 h-2 rounded-full" style="width:0%"></div>
+            </div>
+            <div class="text-xs text-gray-600">Status: <span id="status">---</span></div>
+            <div class="text-xs text-gray-600">Attempts: <span id="attempts">---</span></div>
+          </div>
+          <button onclick="mine()" id="mineBtn" class="w-full bg-purple-600 text-white p-3 rounded-xl font-semibold">Start Mining</button>
+          <div id="mineRes" class="mt-3"></div>
+        `;
+        getStats();
+      }
+      
+      if (type === 'wallet') {
+        title.textContent = 'Wallet Details';
+        content.innerHTML = `
+          <div class="space-y-3">
+            <div class="flex justify-between py-2 border-b">
+              <span class="text-gray-600 text-sm">Address</span>
+              <span class="text-sm font-semibold break-all">${wallet?.address || '---'}</span>
+            </div>
+            <div class="flex justify-between py-2 border-b">
+              <span class="text-gray-600 text-sm">Balance</span>
+              <span class="text-sm font-semibold">${wallet?.balance || '---'}</span>
+            </div>
+            <div class="flex justify-between py-2 border-b">
+              <span class="text-gray-600 text-sm">Blocks Mined</span>
+              <span class="text-sm font-semibold">${wallet?.totalBlocksMined || 0}</span>
+            </div>
+          </div>
+        `;
+      }
+      
+      if (type === 'backup') {
+        title.textContent = 'Backup Wallet';
+        content.innerHTML = `
+          <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl mb-3 text-sm">
+            ⚠️ Creating backup removes wallet from server. Save the code!
+          </div>
+          <button onclick="backup()" class="w-full bg-purple-600 text-white p-3 rounded-xl font-semibold">Create Backup</button>
+          <div id="backupRes" class="mt-3"></div>
+        `;
+      }
+      
+      if (type === 'history') {
+        title.textContent = 'Transaction History';
+        content.innerHTML = '<div class="text-center text-gray-600">Loading...</div>';
+        getHistory();
+      }
+      
+      if (type === 'settings') {
+        title.textContent = 'Settings';
+        content.innerHTML = `
+          <input type="password" id="keyInput" placeholder="Private key" class="w-full p-3 border rounded-xl mb-3">
+          <button onclick="login()" class="w-full bg-purple-600 text-white p-3 rounded-xl font-semibold mb-2">Login</button>
+          <button onclick="logout()" class="w-full bg-gray-200 p-3 rounded-xl font-semibold mb-2">Logout</button>
+          <button onclick="create()" class="w-full bg-gray-200 p-3 rounded-xl font-semibold">Create Wallet</button>
+          <div id="settingsRes" class="mt-3"></div>
+        `;
+      }
+    }
+
+    function closeModal() {
+      document.getElementById('modal').classList.add('hidden');
+    }
+
+    async function login() {
+      const k = document.getElementById('keyInput').value;
+      if (!k) return alert('Enter key');
+      try {
+        const res = await fetch(`${API}/wallet?key_private=${k}`);
+        const data = await res.json();
+        if (data.address) {
+          localStorage.setItem('evc_key', k);
+          key = k;
+          closeModal();
+          load();
+          alert('Login successful!');
+        } else alert('Wallet not found');
+      } catch (e) {
+        alert('Error');
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('evc_key');
+      key = null;
+      wallet = null;
+      closeModal();
+      load();
+    }
+
+    async function create() {
+      try {
+        const res = await fetch(`${API}/wallet?create=true`, {method:'POST'});
+        const data = await res.json();
+        if (data.key_private) {
+          document.getElementById('settingsRes').innerHTML = `
+            <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-xl text-sm">
+              <strong>Created!</strong><br>
+              <strong>⚠️ SAVE KEY:</strong><br>
+              ${data.key_private}<br><br>
+              <strong>Address:</strong><br>
+              ${data.address}
+            </div>
+          `;
+          localStorage.setItem('evc_key', data.key_private);
+          key = data.key_private;
+          setTimeout(() => { closeModal(); load(); }, 3000);
+        }
+      } catch (e) {
+        alert('Error');
+      }
+    }
+
+    async function send() {
+      if (!key) return alert('Login first');
+      const addr = document.getElementById('addr').value;
+      const amt = document.getElementById('amt').value;
+      if (!addr || !amt) return alert('Fill all fields');
+      
+      try {
+        const res = await fetch(`${API}/transfer?private_key=${key}&destination_address=${addr}&amount=${amt}`);
+        const data = await res.json();
+        const el = document.getElementById('sendRes');
+        if (data.success) {
+          el.innerHTML = `<div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-xl text-sm">Success! New balance: ${data.balances.sender}</div>`;
+          load();
+        } else {
+          el.innerHTML = `<div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl text-sm">${data.error}</div>`;
+        }
+      } catch (e) {
+        document.getElementById('sendRes').innerHTML = `<div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl text-sm">Error</div>`;
+      }
+    }
+
+    async function getFee() {
+      try {
+        const res = await fetch(`${API}/transfer?fee`);
+        const data = await res.json();
+        document.getElementById('fee').textContent = data.fee;
+      } catch (e) {}
+    }
+
+    async function getStats() {
+      try {
+        const res = await fetch(`${API}/mine?get_challenge=true`);
+        const data = await res.json();
+        document.getElementById('diff').textContent = data.difficulty;
+        document.getElementById('reward').textContent = data.currentReward.toFixed(5);
+      } catch (e) {}
+    }
+
+    async function mine() {
+      if (!key) return alert('Login first');
+      const btn = document.getElementById('mineBtn');
+      btn.disabled = true;
+      btn.textContent = 'Mining...';
+      document.getElementById('mineProg').classList.remove('hidden');
+      
+      try {
+        const ch = await fetch(`${API}/mine?get_challenge=true`).then(r=>r.json());
+        const acc = await fetch(`${API}/wallet?key_private=${key}`).then(r=>r.json());
+        const addr = acc.address;
+        const ts = ch.timestamp;
+        const tgt = ch.target;
+        
+        let n = 0;
+        let found = false;
+        let h = '';
+        
+        while (!found && n < 10000000) {
+          n++;
+          const d = `${addr}:${ts}:${n}`;
+          h = await sha256(d);
+          const hn = parseInt(h.substring(0,16), 16);
+          const hv = parseInt(h.substring(0,8), 16);
+          if (hv%7===0 && hv%11===3 && hn<tgt) found = true;
+          
+          if (n%1000===0) {
+            document.getElementById('status').textContent = 'Mining...';
+            document.getElementById('attempts').textContent = n.toLocaleString();
+            document.getElementById('progBar').style.width = Math.min(n/100000*100,90)+'%';
+          }
+        }
+        
+        if (!found) throw new Error('Timeout');
+        
+        document.getElementById('progBar').style.width = '100%';
+        document.getElementById('status').textContent = 'Submitting...';
+        
+        const res = await fetch(`${API}/mine?private_key=${key}&nonce=${n}&hash=${h}&timestamp=${ts}`).then(r=>r.json());
+        const el = document.getElementById('mineRes');
+        if (res.success) {
+          el.innerHTML = `<div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-xl text-sm">Success!<br>Mined: ${res.minedAmount}<br>Balance: ${res.newBalance}</div>`;
+          load();
+        } else {
+          el.innerHTML = `<div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl text-sm">Failed. Try again.</div>`;
+        }
+      } catch (e) {
+        document.getElementById('mineRes').innerHTML = `<div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl text-sm">Error: ${e.message}</div>`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Start Mining';
+        document.getElementById('mineProg').classList.add('hidden');
+      }
+    }
+
+    async function backup() {
+      if (!key) return alert('Login first');
+      try {
+        const res = await fetch(`${API}/backup?key_private=${key}`);
+        const data = await res.json();
+        if (data.encrypted) {
+          document.getElementById('backupRes').innerHTML = `
+            <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-xl text-sm">
+              <strong>Backup created!</strong><br>
+              <strong>⚠️ SAVE THIS:</strong><br>
+              <textarea class="w-full mt-2 p-2 text-xs font-mono bg-white border rounded" rows="4">${data.encrypted}</textarea>
+            </div>
+          `;
+          localStorage.removeItem('evc_key');
+          key = null;
+          wallet = null;
+        }
+      } catch (e) {
+        alert('Error');
+      }
+    }
+
+    async function getHistory() {
+      try {
+        const res = await fetch(`${API}/transfer`);
+        const data = await res.json();
+        const addr = wallet?.address;
+        const filtered = data.filter(t => t.from===addr || t.to===addr).slice(-10).reverse();
+        
+        if (filtered.length === 0) {
+          document.getElementById('modalContent').innerHTML = '<div class="text-center text-gray-600">No transactions</div>';
+          return;
+        }
+        
+        const html = filtered.map(t => {
+          const isSent = t.from === addr;
+          return `
+            <div class="bg-gray-100 p-3 rounded-xl mb-2">
+              <div class="flex justify-between mb-1">
+                <span class="font-semibold text-sm">${isSent ? '📤 Sent' : '📥 Received'}</span>
+                <span class="font-bold text-sm ${isSent ? 'text-red-600' : 'text-green-600'}">${isSent ? '-' : '+'}${t.amount}</span>
+              </div>
+              <div class="text-xs text-gray-600">${isSent ? 'To' : 'From'}: ${(isSent ? t.to : t.from).slice(0,12)}...</div>
+              <div class="text-xs text-gray-600">${new Date(t.timestamp).toLocaleString()}</div>
+            </div>
+          `;
+        }).join('');
+        
+        document.getElementById('modalContent').innerHTML = html;
+      } catch (e) {
+        document.getElementById('modalContent').innerHTML = '<div class="text-center text-red-600">Error loading</div>';
+      }
+    }
+
+    function copy(text) {
+      navigator.clipboard.writeText(text);
+      alert('Copied!');
+    }
+
+    async function sha256(msg) {
+      const buf = new TextEncoder().encode(msg);
+      const hash = await crypto.subtle.digest('SHA-256', buf);
+      return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
+    }
+
+    load();
+  </script>
+</body>
+</html>
