@@ -94,6 +94,7 @@
     const API = 'https://evcoin-server.vercel.app';
     let key = localStorage.getItem('evc_key');
     let wallet = null;
+    let miningInterval = null;
 
     async function load() {
       if (!key) return;
@@ -104,9 +105,7 @@
           document.getElementById('balance').textContent = wallet.balance;
           document.getElementById('usd').textContent = `≈ $${(parseFloat(wallet.balance) * 0.5).toFixed(2)}`;
         }
-      } catch (e) {
-        console.error(e);
-      }
+      } catch (e) {}
     }
 
     function showModal(type) {
@@ -131,17 +130,17 @@
       if (type === 'receive') {
         title.textContent = 'Receive EVCoin';
         content.innerHTML = `
-          <div class="bg-blue-50 p-4 rounded-xl mb-3 text-sm">Share this address to receive EVCoin</div>
+          <div class="bg-blue-50 p-4 rounded-xl mb-3 text-sm">Share this address</div>
           <div class="text-xs text-gray-600 mb-1">Your Address</div>
           <div class="bg-gray-100 p-3 rounded-xl text-xs break-all mb-3">${wallet?.address || '---'}</div>
-          <button onclick="copy('${wallet?.address}')" class="w-full bg-gray-200 p-3 rounded-xl font-semibold">Copy Address</button>
+          <button onclick="copy('${wallet?.address}')" class="w-full bg-gray-200 p-3 rounded-xl font-semibold">Copy</button>
         `;
       }
       
       if (type === 'mine') {
         title.textContent = 'Mine EVCoin';
         content.innerHTML = `
-          <div class="bg-blue-50 p-4 rounded-xl mb-3 text-sm">Mining rewards decrease over time</div>
+          <div class="bg-blue-50 p-4 rounded-xl mb-3 text-sm">Server-side mining (anti-cheat)</div>
           <div class="grid grid-cols-2 gap-2 mb-3">
             <div class="bg-gray-100 p-3 rounded-xl text-center">
               <div class="text-xs text-gray-600">Difficulty</div>
@@ -157,7 +156,6 @@
               <div id="progBar" class="bg-purple-600 h-2 rounded-full" style="width:0%"></div>
             </div>
             <div class="text-xs text-gray-600">Status: <span id="status">---</span></div>
-            <div class="text-xs text-gray-600">Attempts: <span id="attempts">---</span></div>
           </div>
           <button onclick="mine()" id="mineBtn" class="w-full bg-purple-600 text-white p-3 rounded-xl font-semibold">Start Mining</button>
           <div id="mineRes" class="mt-3"></div>
@@ -166,7 +164,7 @@
       }
       
       if (type === 'wallet') {
-        title.textContent = 'Wallet Details';
+        title.textContent = 'Wallet';
         content.innerHTML = `
           <div class="space-y-3">
             <div class="flex justify-between py-2 border-b">
@@ -186,18 +184,18 @@
       }
       
       if (type === 'backup') {
-        title.textContent = 'Backup Wallet';
+        title.textContent = 'Backup';
         content.innerHTML = `
           <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl mb-3 text-sm">
-            ⚠️ Creating backup removes wallet from server. Save the code!
+            ⚠️ Backup removes wallet from server!
           </div>
-          <button onclick="backup()" class="w-full bg-purple-600 text-white p-3 rounded-xl font-semibold">Create Backup</button>
+          <button onclick="backup()" class="w-full bg-purple-600 text-white p-3 rounded-xl font-semibold">Create</button>
           <div id="backupRes" class="mt-3"></div>
         `;
       }
       
       if (type === 'history') {
-        title.textContent = 'Transaction History';
+        title.textContent = 'History';
         content.innerHTML = '<div class="text-center text-gray-600">Loading...</div>';
         getHistory();
       }
@@ -208,13 +206,14 @@
           <input type="password" id="keyInput" placeholder="Private key" class="w-full p-3 border rounded-xl mb-3">
           <button onclick="login()" class="w-full bg-purple-600 text-white p-3 rounded-xl font-semibold mb-2">Login</button>
           <button onclick="logout()" class="w-full bg-gray-200 p-3 rounded-xl font-semibold mb-2">Logout</button>
-          <button onclick="create()" class="w-full bg-gray-200 p-3 rounded-xl font-semibold">Create Wallet</button>
+          <button onclick="create()" class="w-full bg-gray-200 p-3 rounded-xl font-semibold">Create</button>
           <div id="settingsRes" class="mt-3"></div>
         `;
       }
     }
 
     function closeModal() {
+      if (miningInterval) clearInterval(miningInterval);
       document.getElementById('modal').classList.add('hidden');
     }
 
@@ -229,8 +228,8 @@
           key = k;
           closeModal();
           load();
-          alert('Login successful!');
-        } else alert('Wallet not found');
+          alert('Success!');
+        } else alert('Not found');
       } catch (e) {
         alert('Error');
       }
@@ -246,14 +245,13 @@
 
     async function create() {
       try {
-        // Changed from POST to GET request
         const res = await fetch(`${API}/Wallet?create=true`);
         const data = await res.json();
         if (data.key_private) {
           document.getElementById('settingsRes').innerHTML = `
             <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-xl text-sm">
               <strong>Created!</strong><br>
-              <strong>⚠️ SAVE KEY:</strong><br>
+              <strong>⚠️ SAVE:</strong><br>
               ${data.key_private}<br><br>
               <strong>Address:</strong><br>
               ${data.address}
@@ -263,11 +261,10 @@
           key = data.key_private;
           setTimeout(() => { closeModal(); load(); }, 3000);
         } else {
-          alert(data.message || 'Error creating wallet');
+          alert(data.message || 'Error');
         }
       } catch (e) {
-        console.error('Create wallet error:', e);
-        alert('Error creating wallet. Check console for details.');
+        alert('Error');
       }
     }
 
@@ -275,14 +272,14 @@
       if (!key) return alert('Login first');
       const addr = document.getElementById('addr').value;
       const amt = document.getElementById('amt').value;
-      if (!addr || !amt) return alert('Fill all fields');
+      if (!addr || !amt) return alert('Fill all');
       
       try {
         const res = await fetch(`${API}/transfer?private_key=${key}&destination_address=${addr}&amount=${amt}`);
         const data = await res.json();
         const el = document.getElementById('sendRes');
         if (data.success) {
-          el.innerHTML = `<div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-xl text-sm">Success! New balance: ${data.balances.sender}</div>`;
+          el.innerHTML = `<div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-xl text-sm">Success! Balance: ${data.balances.sender}</div>`;
           load();
         } else {
           el.innerHTML = `<div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl text-sm">${data.error}</div>`;
@@ -302,7 +299,7 @@
 
     async function getStats() {
       try {
-        const res = await fetch(`${API}/mine?get_challenge=true`);
+        const res = await fetch(`${API}/mine`);
         const data = await res.json();
         document.getElementById('diff').textContent = data.difficulty;
         document.getElementById('reward').textContent = data.currentReward.toFixed(5);
@@ -313,51 +310,66 @@
       if (!key) return alert('Login first');
       const btn = document.getElementById('mineBtn');
       btn.disabled = true;
-      btn.textContent = 'Mining...';
+      btn.textContent = 'Starting...';
       document.getElementById('mineProg').classList.remove('hidden');
       
       try {
-        const ch = await fetch(`${API}/mine?get_challenge=true`).then(r=>r.json());
-        const acc = await fetch(`${API}/Wallet?key_private=${key}`).then(r=>r.json());
-        const addr = acc.address;
-        const ts = ch.timestamp;
-        const tgt = ch.target;
+        const start = await fetch(`${API}/mine?private_key=${key}&start_mine=true`).then(r=>r.json());
         
-        let n = 0;
-        let found = false;
-        let h = '';
+        if (start.message && start.message.includes('Wait')) {
+          document.getElementById('mineRes').innerHTML = `<div class="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-xl text-sm">${start.message}</div>`;
+          btn.disabled = false;
+          btn.textContent = 'Start Mining';
+          document.getElementById('mineProg').classList.add('hidden');
+          return;
+        }
+
+        document.getElementById('status').textContent = 'Mining on server...';
         
-        while (!found && n < 10000000) {
-          n++;
-          const d = `${addr}:${ts}:${n}`;
-          h = await sha256(d);
-          const hn = parseInt(h.substring(0,16), 16);
-          const hv = parseInt(h.substring(0,8), 16);
-          if (hv%7===0 && hv%11===3 && hn<tgt) found = true;
+        let attempts = 0;
+        miningInterval = setInterval(async () => {
+          attempts++;
           
-          if (n%1000===0) {
-            document.getElementById('status').textContent = 'Mining...';
-            document.getElementById('attempts').textContent = n.toLocaleString();
-            document.getElementById('progBar').style.width = Math.min(n/100000*100,90)+'%';
+          const status = await fetch(`${API}/mine?private_key=${key}&check_status=true`).then(r=>r.json());
+          
+          if (status.status === 'completed') {
+            clearInterval(miningInterval);
+            document.getElementById('progBar').style.width = '100%';
+            const el = document.getElementById('mineRes');
+            el.innerHTML = `<div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-xl text-sm">Success!<br>Mined: ${status.result.minedAmount}<br>Balance: ${status.result.newBalance}</div>`;
+            btn.disabled = false;
+            btn.textContent = 'Start Mining';
+            document.getElementById('mineProg').classList.add('hidden');
+            load();
+            return;
           }
-        }
-        
-        if (!found) throw new Error('Timeout');
-        
-        document.getElementById('progBar').style.width = '100%';
-        document.getElementById('status').textContent = 'Submitting...';
-        
-        const res = await fetch(`${API}/mine?private_key=${key}&nonce=${n}&hash=${h}&timestamp=${ts}`).then(r=>r.json());
-        const el = document.getElementById('mineRes');
-        if (res.success) {
-          el.innerHTML = `<div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-xl text-sm">Success!<br>Mined: ${res.minedAmount}<br>Balance: ${res.newBalance}</div>`;
-          load();
-        } else {
-          el.innerHTML = `<div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl text-sm">Failed. Try again.</div>`;
-        }
+          
+          if (status.status === 'failed') {
+            clearInterval(miningInterval);
+            const el = document.getElementById('mineRes');
+            el.innerHTML = `<div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl text-sm">${status.message || 'Failed'}</div>`;
+            btn.disabled = false;
+            btn.textContent = 'Start Mining';
+            document.getElementById('mineProg').classList.add('hidden');
+            return;
+          }
+          
+          const progress = status.progress || (attempts * 2);
+          document.getElementById('progBar').style.width = Math.min(progress, 95) + '%';
+          document.getElementById('status').textContent = status.message || 'Mining...';
+          
+          if (attempts > 30) {
+            clearInterval(miningInterval);
+            document.getElementById('mineRes').innerHTML = `<div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl text-sm">Timeout</div>`;
+            btn.disabled = false;
+            btn.textContent = 'Start Mining';
+            document.getElementById('mineProg').classList.add('hidden');
+          }
+        }, 2000);
+
       } catch (e) {
-        document.getElementById('mineRes').innerHTML = `<div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl text-sm">Error: ${e.message}</div>`;
-      } finally {
+        if (miningInterval) clearInterval(miningInterval);
+        document.getElementById('mineRes').innerHTML = `<div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl text-sm">Error</div>`;
         btn.disabled = false;
         btn.textContent = 'Start Mining';
         document.getElementById('mineProg').classList.add('hidden');
@@ -372,8 +384,8 @@
         if (data.encrypted) {
           document.getElementById('backupRes').innerHTML = `
             <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-xl text-sm">
-              <strong>Backup created!</strong><br>
-              <strong>⚠️ SAVE THIS:</strong><br>
+              <strong>Created!</strong><br>
+              <strong>⚠️ SAVE:</strong><br>
               <textarea class="w-full mt-2 p-2 text-xs font-mono bg-white border rounded" rows="4">${data.encrypted}</textarea>
             </div>
           `;
@@ -414,19 +426,13 @@
         
         document.getElementById('modalContent').innerHTML = html;
       } catch (e) {
-        document.getElementById('modalContent').innerHTML = '<div class="text-center text-red-600">Error loading</div>';
+        document.getElementById('modalContent').innerHTML = '<div class="text-center text-red-600">Error</div>';
       }
     }
 
     function copy(text) {
       navigator.clipboard.writeText(text);
       alert('Copied!');
-    }
-
-    async function sha256(msg) {
-      const buf = new TextEncoder().encode(msg);
-      const hash = await crypto.subtle.digest('SHA-256', buf);
-      return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2,'0')).join('');
     }
 
     load();
