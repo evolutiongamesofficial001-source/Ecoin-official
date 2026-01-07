@@ -103,7 +103,8 @@
         wallet = await res.json();
         if (wallet.address) {
           document.getElementById('balance').textContent = wallet.balance;
-          document.getElementById('usd').textContent = `≈ $${(parseFloat(wallet.balance) * 0.5).toFixed(2)}`;
+       document.getElementById('usd').textContent =
+  `≈ R$ ${(parseFloat(wallet.balance) * 10).toFixed(2)}`;   
         }
       } catch (e) {}
     }
