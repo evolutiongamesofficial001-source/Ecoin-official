@@ -1,143 +1,351 @@
-const axios = require('axios');
-const cors = require('cors');
-const crypto = require('crypto');
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EVCoin Wallet</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-purple-600 to-blue-600 min-h-screen p-4">
+  <div class="max-w-md mx-auto bg-white rounded-3xl shadow-2xl overflow-hidden">
+    <div class="bg-gradient-to-r from-purple-600 to-blue-600 p-6 text-white">
+      <h1 class="text-3xl font-bold mb-1">💎 EVCoin</h1>
+      <p class="text-sm opacity-90">Digital Wallet</p>
+      <div class="mt-4 bg-white/20 backdrop-blur rounded-2xl p-4">
+        <p class="text-xs opacity-90">Balance</p>
+        <p class="text-4xl font-bold" id="balance">0.00000</p>
+        <p class="text-sm opacity-80" id="usd">≈ $0.00</p>
+      </div>
+    </div>
 
-const firebaseUrl = 'https://ecoin-b7697-default-rtdb.firebaseio.com/.json';
-const firebaseUrl1 = 'https://ecoin-b7697-default-rtdb.firebaseio.com';
-const transactionHistoryUrl = 'https://transfereciaecoin-default-rtdb.firebaseio.com';
+    <div class="grid grid-cols-3 gap-3 p-4">
+      <button onclick="showModal('send')" class="bg-gray-100 p-4 rounded-xl text-center hover:bg-gray-200">
+        <div class="text-2xl mb-1">📤</div>
+        <div class="text-xs font-semibold">Send</div>
+      </button>
+      <button onclick="showModal('receive')" class="bg-gray-100 p-4 rounded-xl text-center hover:bg-gray-200">
+        <div class="text-2xl mb-1">📥</div>
+        <div class="text-xs font-semibold">Receive</div>
+      </button>
+      <button onclick="showModal('mine')" class="bg-gray-100 p-4 rounded-xl text-center hover:bg-gray-200">
+        <div class="text-2xl mb-1">⛏️</div>
+        <div class="text-xs font-semibold">Mine</div>
+      </button>
+    </div>
 
-const corsHandler = cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type'],
-});
+    <div class="p-4 space-y-2">
+      <button onclick="showModal('wallet')" class="w-full bg-gray-100 p-4 rounded-xl flex items-center justify-between hover:bg-gray-200">
+        <div class="flex items-center gap-3">
+          <div class="text-2xl">👤</div>
+          <div class="text-left">
+            <div class="font-semibold text-sm">My Wallet</div>
+            <div class="text-xs text-gray-500">View details</div>
+          </div>
+        </div>
+        <div class="text-gray-400">›</div>
+      </button>
 
-function generateTransactionId() {
-  return crypto.randomBytes(16).toString('hex');
-}
+      <button onclick="showModal('backup')" class="w-full bg-gray-100 p-4 rounded-xl flex items-center justify-between hover:bg-gray-200">
+        <div class="flex items-center gap-3">
+          <div class="text-2xl">💾</div>
+          <div class="text-left">
+            <div class="font-semibold text-sm">Backup</div>
+            <div class="text-xs text-gray-500">Secure wallet</div>
+          </div>
+        </div>
+        <div class="text-gray-400">›</div>
+      </button>
 
-function verifyPrivateKey(privateKey, storedHash) {
-  try {
-    const [salt, originalHash] = storedHash.split(':');
-    const hash = crypto.pbkdf2Sync(privateKey, salt, 100000, 128, 'sha512').toString('hex');
-    return hash === originalHash;
-  } catch {
-    return false;
-  }
-}
+      <button onclick="showModal('history')" class="w-full bg-gray-100 p-4 rounded-xl flex items-center justify-between hover:bg-gray-200">
+        <div class="flex items-center gap-3">
+          <div class="text-2xl">📜</div>
+          <div class="text-left">
+            <div class="font-semibold text-sm">History</div>
+            <div class="text-xs text-gray-500">Transactions</div>
+          </div>
+        </div>
+        <div class="text-gray-400">›</div>
+      </button>
 
-async function getTransactionHistory() {
-  try {
-    const res = await axios.get(transactionHistoryUrl + '.json');
-    return res.data || {};
-  } catch {
-    return {};
-  }
-}
+      <button onclick="showModal('settings')" class="w-full bg-gray-100 p-4 rounded-xl flex items-center justify-between hover:bg-gray-200">
+        <div class="flex items-center gap-3">
+          <div class="text-2xl">⚙️</div>
+          <div class="text-left">
+            <div class="font-semibold text-sm">Settings</div>
+            <div class="text-xs text-gray-500">Login</div>
+          </div>
+        </div>
+        <div class="text-gray-400">›</div>
+      </button>
+    </div>
+  </div>
 
-async function calculateDynamicFee(amount) {
-  const txs = await getTransactionHistory();
-  const count = Object.keys(txs).length;
-  let fee = 0.00001 + (count * 0.000001) + (amount * 0.000001);
-  if (fee > 0.00003) fee = 0.00003;
-  return Number(fee.toFixed(5));
-}
+  <div id="modal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-bold" id="modalTitle">Modal</h2>
+        <button onclick="closeModal()" class="text-2xl">×</button>
+      </div>
+      <div id="modalContent"></div>
+    </div>
+  </div>
 
-async function saveTransaction(tx) {
-  try {
-    await axios.put(`${transactionHistoryUrl}/${tx.id}.json`, tx);
-    return true;
-  } catch {
-    return false;
-  }
-}
+  <script>
+    const API = 'https://evcoin-server.vercel.app';
+    let key = localStorage.getItem('evc_key');
+    let wallet = null;
+    let miningInterval = null;
 
-function normalize(v) {
-  return typeof v === 'string' ? v.replace(',', '.') : v;
-}
-
-module.exports = async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') return res.status(200).end();
-
-  corsHandler(req, res, async () => {
-    try {
-      if (req.method === 'GET' && req.query.fee !== undefined) {
-        const fee = await calculateDynamicFee(1);
-        return res.status(200).json({ fee });
-      }
-
-      if (req.method === 'GET') {
-        const txs = await getTransactionHistory();
-        return res.status(200).json(txs);
-      }
-
-      if (req.method === 'POST') {
-        const { private_key, destination_address, amount } = req.body;
-        if (!private_key || !destination_address || !amount) {
-          return res.status(400).json({ success: false, error: 'Missing parameters' });
+    async function load() {
+      if (!key) return;
+      try {
+        const res = await fetch(`${API}/Wallet?key_private=${key}`);
+        wallet = await res.json();
+        if (wallet.address) {
+          document.getElementById('balance').textContent = wallet.balance;
+          document.getElementById('usd').textContent = `≈ $${(parseFloat(wallet.balance) * 0.5).toFixed(2)}`;
         }
-
-        const value = parseFloat(normalize(amount));
-        if (isNaN(value) || value <= 0) {
-          return res.status(400).json({ success: false, error: 'Invalid amount' });
-        }
-
-        const fee = await calculateDynamicFee(value);
-        const total = Number((value + fee).toFixed(5));
-
-        const { data: accounts } = await axios.get(firebaseUrl);
-        if (!accounts) return res.status(404).json({ success: false, error: 'No wallets' });
-
-        let senderId, sender, receiverId, receiver;
-
-        for (const [id, acc] of Object.entries(accounts)) {
-          if (verifyPrivateKey(private_key, acc.key_hash)) {
-            senderId = id;
-            sender = acc;
-          }
-          if (acc.address === destination_address) {
-            receiverId = id;
-            receiver = acc;
-          }
-        }
-
-        if (!sender) return res.status(404).json({ success: false, error: 'Invalid private key' });
-        if (!receiver) return res.status(404).json({ success: false, error: 'Destination not found' });
-
-        const senderBalance = parseFloat(normalize(sender.balance));
-        if (senderBalance < total) return res.status(400).json({ success: false, error: 'Insufficient balance' });
-
-        const newSender = (senderBalance - total).toFixed(5);
-        const newReceiver = (parseFloat(receiver.balance) + value).toFixed(5);
-
-        await axios.patch(`${firebaseUrl1}/${senderId}.json`, { balance: newSender });
-        await axios.patch(`${firebaseUrl1}/${receiverId}.json`, { balance: newReceiver });
-
-        const tx = {
-          id: generateTransactionId(),
-          from: sender.address,
-          to: receiver.address,
-          amount: value.toFixed(5),
-          fee,
-          timestamp: new Date().toISOString(),
-        };
-
-        if (!(await saveTransaction(tx))) return res.status(500).json({ success: false, error: 'Tx save failed' });
-
-        return res.status(200).json({
-          success: true,
-          transaction: tx,
-          balances: { sender: newSender, receiver: newReceiver },
-        });
-      }
-
-      return res.status(405).json({ error: 'Method not allowed' });
-    } catch (e) {
-      return res.status(500).json({ success: false, error: e.message });
+      } catch (e) {}
     }
-  });
-};
+
+    function showModal(type) {
+      const modal = document.getElementById('modal');
+      const title = document.getElementById('modalTitle');
+      const content = document.getElementById('modalContent');
+      modal.classList.remove('hidden');
+      if (type === 'send') {
+        title.textContent = 'Send EVCoin';
+        content.innerHTML = `
+          <input type="text" id="addr" placeholder="Recipient address" class="w-full p-3 border rounded-xl mb-3">
+          <input type="number" id="amt" placeholder="Amount" step="0.00001" class="w-full p-3 border rounded-xl mb-3">
+          <div class="text-sm text-gray-600 mb-3">Fee: <span id="fee">0.00001</span> EVC</div>
+          <button onclick="send()" class="w-full bg-purple-600 text-white p-3 rounded-xl font-semibold">Send</button>
+          <div id="sendRes" class="mt-3"></div>
+        `;
+        getFee();
+      }
+      if (type === 'receive') {
+        title.textContent = 'Receive EVCoin';
+        content.innerHTML = `
+          <div class="bg-blue-50 p-4 rounded-xl mb-3 text-sm">Share this address</div>
+          <div class="text-xs text-gray-600 mb-1">Your Address</div>
+          <div class="bg-gray-100 p-3 rounded-xl text-xs break-all mb-3">${wallet?.address || '---'}</div>
+          <button onclick="copy('${wallet?.address}')" class="w-full bg-gray-200 p-3 rounded-xl font-semibold">Copy</button>
+        `;
+      }
+      if (type === 'mine') {
+        title.textContent = 'Mine EVCoin';
+        content.innerHTML = `
+          <div class="bg-blue-50 p-4 rounded-xl mb-3 text-sm">Server-side mining (anti-cheat)</div>
+          <div class="grid grid-cols-2 gap-2 mb-3">
+            <div class="bg-gray-100 p-3 rounded-xl text-center">
+              <div class="text-xs text-gray-600">Difficulty</div>
+              <div class="font-bold text-purple-600" id="diff">---</div>
+            </div>
+            <div class="bg-gray-100 p-3 rounded-xl text-center">
+              <div class="text-xs text-gray-600">Reward</div>
+              <div class="font-bold text-purple-600" id="reward">---</div>
+            </div>
+          </div>
+          <div id="mineProg" class="hidden mb-3">
+            <div class="w-full bg-gray-200 rounded-full h-2 mb-2">
+              <div id="progBar" class="bg-purple-600 h-2 rounded-full" style="width:0%"></div>
+            </div>
+            <div class="text-xs text-gray-600">Status: <span id="status">---</span></div>
+          </div>
+          <button onclick="mine()" id="mineBtn" class="w-full bg-purple-600 text-white p-3 rounded-xl font-semibold">Start Mining</button>
+          <div id="mineRes" class="mt-3"></div>
+        `;
+        getStats();
+      }
+      if (type === 'wallet') {
+        title.textContent = 'Wallet';
+        content.innerHTML = `
+          <div class="space-y-3">
+            <div class="flex justify-between py-2 border-b">
+              <span class="text-gray-600 text-sm">Address</span>
+              <span class="text-sm font-semibold break-all">${wallet?.address || '---'}</span>
+            </div>
+            <div class="flex justify-between py-2 border-b">
+              <span class="text-gray-600 text-sm">Balance</span>
+              <span class="text-sm font-semibold">${wallet?.balance || '---'}</span>
+            </div>
+            <div class="flex justify-between py-2 border-b">
+              <span class="text-gray-600 text-sm">Blocks Mined</span>
+              <span class="text-sm font-semibold">${wallet?.totalBlocksMined || 0}</span>
+            </div>
+          </div>
+        `;
+      }
+      if (type === 'backup') {
+        title.textContent = 'Backup';
+        content.innerHTML = `
+          <div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl mb-3 text-sm">
+            ⚠️ Backup removes wallet from server!
+          </div>
+          <button onclick="backup()" class="w-full bg-purple-600 text-white p-3 rounded-xl font-semibold">Create</button>
+          <div id="backupRes" class="mt-3"></div>
+        `;
+      }
+      if (type === 'history') {
+        title.textContent = 'History';
+        content.innerHTML = '<div class="text-center text-gray-600">Loading...</div>';
+        getHistory();
+      }
+      if (type === 'settings') {
+        title.textContent = 'Settings';
+        content.innerHTML = `
+          <input type="password" id="keyInput" placeholder="Private key" class="w-full p-3 border rounded-xl mb-3">
+          <button onclick="login()" class="w-full bg-purple-600 text-white p-3 rounded-xl font-semibold mb-2">Login</button>
+          <button onclick="logout()" class="w-full bg-gray-200 p-3 rounded-xl font-semibold mb-2">Logout</button>
+          <button onclick="create()" class="w-full bg-gray-200 p-3 rounded-xl font-semibold">Create</button>
+          <div id="settingsRes" class="mt-3"></div>
+        `;
+      }
+    }
+
+    function closeModal() {
+      if (miningInterval) clearInterval(miningInterval);
+      document.getElementById('modal').classList.add('hidden');
+    }
+
+    async function login() {
+      const k = document.getElementById('keyInput').value;
+      if (!k) return alert('Enter key');
+      try {
+        const res = await fetch(`${API}/Wallet?key_private=${k}`);
+        const data = await res.json();
+        if (data.address) {
+          localStorage.setItem('evc_key', k);
+          key = k;
+          closeModal();
+          load();
+          alert('Success!');
+        } else alert('Not found');
+      } catch (e) {
+        alert('Error');
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('evc_key');
+      key = null;
+      wallet = null;
+      closeModal();
+      load();
+    }
+
+    async function create() {
+      try {
+        const res = await fetch(`${API}/Wallet?create=true`);
+        const data = await res.json();
+        if (data.key_private) {
+          document.getElementById('settingsRes').innerHTML = `
+            <div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-xl text-sm">
+              <strong>Created!</strong><br>
+              <strong>⚠️ SAVE:</strong><br>
+              ${data.key_private}<br><br>
+              <strong>Address:</strong><br>
+              ${data.address}
+            </div>
+          `;
+          localStorage.setItem('evc_key', data.key_private);
+          key = data.key_private;
+          setTimeout(() => { closeModal(); load(); }, 3000);
+        } else {
+          alert(data.message || 'Error');
+        }
+      } catch (e) {
+        alert('Error');
+      }
+    }
+
+    async function send() {
+      if (!key) return alert('Login first');
+      const addr = document.getElementById('addr').value;
+      const amt = document.getElementById('amt').value;
+      if (!addr || !amt) return alert('Fill all');
+      
+      try {
+        const res = await fetch(`${API}/transfer?private_key=${key}&destination_address=${addr}&amount=${amt}`);
+        const data = await res.json();
+        const el = document.getElementById('sendRes');
+        if (data.success) {
+          el.innerHTML = `<div class="bg-green-50 border-l-4 border-green-500 p-4 rounded-xl text-sm">Success! Balance: ${data.balances.sender}</div>`;
+          load();
+        } else {
+          el.innerHTML = `<div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl text-sm">${data.error}</div>`;
+        }
+      } catch (e) {
+        document.getElementById('sendRes').innerHTML = `<div class="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl text-sm">Error</div>`;
+      }
+    }
+
+    async function getFee() {
+      try {
+        const res = await fetch(`${API}/transfer?fee`);
+        const data = await res.json();
+        document.getElementById('fee').textContent = data.fee;
+      } catch (e) {}
+    }
+
+    async function getHistory() {
+  const modal = document.getElementById('modalContent');
+  try {
+    const res = await fetch(`${API}/transfer`);
+    if (!res.ok) throw new Error('Failed to fetch transactions');
+    const data = await res.json();
+
+    const addr = wallet?.address; 
+    if (!addr) throw new Error('Wallet address not found');
+
+    const transactions = Object.values(data || {});
+    const filtered = transactions.filter(t => t.from === addr || t.to === addr)
+                                 .slice(-10)
+                                 .reverse();
+
+    if (filtered.length === 0) {
+      modal.innerHTML = '<div class="text-center text-gray-600">No transactions</div>';
+      return;
+    }
+
+    const accountsRes = await fetch(`${API}/Wallet`);
+    if (!accountsRes.ok) throw new Error('Failed to fetch wallets');
+    const accounts = await accountsRes.json();
+
+    const html = filtered.map(t => {
+      const isSent = t.from === addr;
+      const counterpartyAddr = isSent ? t.to : t.from;
+      const counterpartyAddress = accounts?.[counterpartyAddr]?.address || counterpartyAddr;
+
+      return `
+        <div class="bg-gray-100 p-3 rounded-xl mb-2">
+          <div class="flex justify-between mb-1">
+            <span class="font-semibold text-sm">${isSent ? '📤 Sent' : '📥 Received'}</span>
+            <span class="font-bold text-sm ${isSent ? 'text-red-600' : 'text-green-600'}">
+              ${isSent ? '-' : '+'}${t.amount}
+            </span>
+          </div>
+          <div class="text-xs text-gray-600">${isSent ? 'To' : 'From'}: ${counterpartyAddress.slice(0,12)}...</div>
+          <div class="text-xs text-gray-600">${new Date(t.timestamp).toLocaleString()}</div>
+        </div>
+      `;
+    }).join('');
+
+    modal.innerHTML = html;
+
+  } catch (e) {
+    console.error(e);
+    modal.innerHTML = `<div class="text-center text-red-600">Error loading transactions: ${e.message}</div>`;
+  }
+}
+
+    function copy(text) {
+      navigator.clipboard.writeText(text);
+      alert('Copied!');
+    }
+
+    load();
+  </script>
+</body>
+</html>
